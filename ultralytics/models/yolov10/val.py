@@ -22,3 +22,31 @@ class YOLOv10DetectionValidator(DetectionValidator):
             boxes, scores, labels = ops.v10postprocess(preds, self.args.max_det, self.nc)
             bboxes = ops.xywh2xyxy(boxes)
             return torch.cat([bboxes, scores.unsqueeze(-1), labels.unsqueeze(-1)], dim=-1)
+    def calculate_metrics(self, true_labels, pred_labels):
+        precision = precision_score(true_labels, pred_labels, average='weighted')
+        recall = recall_score(true_labels, pred_labels, average='weighted')
+        accuracy = accuracy_score(true_labels, pred_labels)
+        return precision, recall, accuracy
+
+    def evaluate(self, preds, targets):
+        # Evaluate and compute metrics
+        true_labels = []
+        pred_labels = []
+
+        for target in targets:
+            true_labels.extend(target["labels"].cpu().numpy())
+
+        for pred in preds:
+            pred_labels.extend(pred[..., -1].cpu().numpy())
+
+        precision, recall, accuracy = self.calculate_metrics(true_labels, pred_labels)
+        map_val = self.map(preds, targets)
+        
+        metrics = {
+            "precision": precision,
+            "recall": recall,
+            "accuracy": accuracy,
+            "map": map_val
+        }
+        
+        return metrics
